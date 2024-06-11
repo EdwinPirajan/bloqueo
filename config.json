@@ -1,0 +1,7 @@
+{
+    "processes": [
+        "javaw.exe",
+        "Clientes.exe",
+        "Gestion.exe"
+    ]
+}
