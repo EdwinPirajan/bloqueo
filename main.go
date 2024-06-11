@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -77,20 +76,23 @@ func checkForDuplicateInstance() (windows.Handle, error) {
 func main() {
 	mutexHandle, err := checkForDuplicateInstance()
 	if err != nil {
-		log.Fatalf("Application already running: %v", err)
+		fmt.Printf("Application already running: %v\n", err)
+		return
 	}
 	defer windows.CloseHandle(mutexHandle)
 
 	// logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	// if err != nil {
-	// 	log.Fatalf("Error opening log file: %v", err)
+	// 	fmt.Printf("Error opening log file: %v\n", err)
+	// 	return
 	// }
 	// defer logFile.Close()
 	// log.SetOutput(logFile)
 
 	err = enableDebugPrivilege()
 	if err != nil {
-		log.Fatalf("Error enabling debug privilege: %v", err)
+		fmt.Printf("Error enabling debug privilege: %v\n", err)
+		return
 	}
 
 	systray.Run(onReady, onExit)
@@ -99,7 +101,8 @@ func main() {
 func onReady() {
 	iconData, err := getIcon("icono.ico")
 	if err != nil {
-		log.Fatalf("Error loading icon: %v", err)
+		fmt.Printf("Error loading icon: %v\n", err)
+		return
 	}
 	systray.SetIcon(iconData)
 	systray.SetTitle("ScrapeBlocker")
@@ -109,58 +112,73 @@ func onReady() {
 
 	config, err := loadConfig("config.json")
 	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+		fmt.Printf("Error loading config: %v\n", err)
+		return
 	}
 
 	go func() {
 		chromeService := services.NewChromeService("https://apps.mypurecloud.com")
-
 		appManager := services.NewWindowsApplicationManager()
 
 		selectors := []string{"Finalizar llamada"}
 		processesToMonitor := config.Processes
 
+		var previousMatchingProcesses []string
+		var previousShouldBlock bool
+		shouldBlock := true
+
 		for {
 			htmlContent, err := chromeService.GetFullPageHTML()
-			shouldBlock := false
-
 			if err != nil {
-				log.Printf("Error: %v", err)
+				fmt.Printf("Error: %v\n", err)
 				shouldBlock = true
 			} else {
+				shouldBlock = true
 				for _, selector := range selectors {
-					if !strings.Contains(htmlContent, selector) {
-						shouldBlock = true
+					if strings.Contains(htmlContent, selector) { // Corrige el error importando el paquete strings
+						shouldBlock = false
 						break
 					}
 				}
 			}
 
-			if shouldBlock {
-				activeProcesses, err := appManager.ListApplications()
-				if err != nil {
-					log.Printf("Error listing applications: %v", err)
-					continue
-				}
+			activeProcesses, err := appManager.ListApplications()
+			if err != nil {
+				fmt.Printf("Error listing applications: %v\n", err)
+				continue
+			}
 
-				matchingProcesses := appManager.Intersect(activeProcesses, processesToMonitor)
-				fmt.Printf("Procesos coincidentes: %v\n", matchingProcesses)
+			matchingProcesses := appManager.Intersect(activeProcesses, processesToMonitor)
+			fmt.Printf("Procesos coincidentes: %v\n", matchingProcesses)
 
+			// Check for changes in matching processes or shouldBlock state
+			if !appManager.EqualStringSlices(matchingProcesses, previousMatchingProcesses) || shouldBlock != previousShouldBlock {
 				for _, process := range matchingProcesses {
 					handles, err := appManager.GetProcessHandles(process)
 					if err != nil {
-						log.Printf("Error getting handles for %s: %v\n", process, err)
+						fmt.Printf("Error getting handles for %s: %v\n", process, err)
 						continue
 					}
 					for _, handle := range handles {
-						err := appManager.SuspendProcess(handle)
-						if err != nil {
-							log.Printf("Error suspending process %s: %v\n", process, err)
+						if shouldBlock {
+							err := appManager.SuspendProcess(handle)
+							if err != nil {
+								fmt.Printf("Error suspending process %s: %v\n", process, err)
+							} else {
+								fmt.Printf("Process %s suspended.\n", process)
+							}
 						} else {
-							log.Printf("Process %s suspended.\n", process)
+							err := appManager.ResumeProcess(handle)
+							if err != nil {
+								fmt.Printf("Error resuming process %s: %v\n", process, err)
+							} else {
+								fmt.Printf("Process %s resumed.\n", process)
+							}
 						}
 					}
 				}
+				previousMatchingProcesses = matchingProcesses
+				previousShouldBlock = shouldBlock
 			}
 
 			time.Sleep(2 * time.Second)

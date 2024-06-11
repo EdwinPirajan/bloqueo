@@ -13,6 +13,7 @@ type ApplicationManager interface {
 	BlockApplication(processName string) error
 	UnblockApplication(processName string) error
 	SuspendProcess(handle windows.Handle) error
+	ResumeProcess(handle windows.Handle) error // Añadir ResumeProcess a la interfaz
 	ListApplications() ([]string, error)
 	Intersect(a, b []string) []string
 	EqualStringSlices(a, b []string) bool
@@ -143,6 +144,10 @@ func (s *windowsApplicationManager) UnblockApplication(processName string) error
 
 func (s *windowsApplicationManager) SuspendProcess(handle windows.Handle) error {
 	return suspendProcess(handle)
+}
+
+func (s *windowsApplicationManager) ResumeProcess(handle windows.Handle) error {
+	return resumeProcess(handle)
 }
 
 func (s *windowsApplicationManager) Intersect(a, b []string) []string {
