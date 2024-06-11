@@ -13,7 +13,7 @@ type ApplicationManager interface {
 	BlockApplication(processName string) error
 	UnblockApplication(processName string) error
 	SuspendProcess(handle windows.Handle) error
-	ResumeProcess(handle windows.Handle) error // Añadir ResumeProcess a la interfaz
+	ResumeProcess(handle windows.Handle) error
 	ListApplications() ([]string, error)
 	Intersect(a, b []string) []string
 	EqualStringSlices(a, b []string) bool

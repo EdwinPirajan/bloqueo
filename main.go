@@ -81,14 +81,6 @@ func main() {
 	}
 	defer windows.CloseHandle(mutexHandle)
 
-	// logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	// if err != nil {
-	// 	fmt.Printf("Error opening log file: %v\n", err)
-	// 	return
-	// }
-	// defer logFile.Close()
-	// log.SetOutput(logFile)
-
 	err = enableDebugPrivilege()
 	if err != nil {
 		fmt.Printf("Error enabling debug privilege: %v\n", err)
@@ -125,18 +117,18 @@ func onReady() {
 
 		var previousMatchingProcesses []string
 		var previousShouldBlock bool
-		shouldBlock := true
 
 		for {
+			shouldBlock := false
+
 			htmlContent, err := chromeService.GetFullPageHTML()
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				shouldBlock = true
 			} else {
-				shouldBlock = true
 				for _, selector := range selectors {
-					if strings.Contains(htmlContent, selector) { // Corrige el error importando el paquete strings
-						shouldBlock = false
+					if !strings.Contains(htmlContent, selector) {
+						shouldBlock = true
 						break
 					}
 				}
