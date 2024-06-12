@@ -17,8 +17,6 @@ type Config struct {
 	Processes []string `json:"processes"`
 }
 
-const SE_DEBUG_NAME = "SeDebugPrivilege"
-
 func loadConfig(path string) (Config, error) {
 	var config Config
 	file, err := ioutil.ReadFile(path)
@@ -32,77 +30,17 @@ func loadConfig(path string) (Config, error) {
 	return config, nil
 }
 
-func enableDebugPrivilege() error {
-	var hToken windows.Token
-	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &hToken)
-	if err != nil {
-		return err
-	}
-	defer hToken.Close()
-
-	var tkp windows.Tokenprivileges
-	tkp.PrivilegeCount = 1
-	tkp.Privileges[0].Attributes = windows.SE_PRIVILEGE_ENABLED
-
-	name, err := windows.UTF16PtrFromString(SE_DEBUG_NAME)
-	if err != nil {
-		return err
-	}
-	err = windows.LookupPrivilegeValue(nil, name, &tkp.Privileges[0].Luid)
-	if err != nil {
-		return err
-	}
-
-	err = windows.AdjustTokenPrivileges(hToken, false, &tkp, 0, nil, nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func GetCurrentSessionID() (uint32, error) {
-	var sessionID uint32
-	processID := windows.GetCurrentProcessId()
-	err := windows.ProcessIdToSessionId(processID, &sessionID)
-	if err != nil {
-		return 0, err
-	}
-	return sessionID, nil
-}
-
-func getSessionMutexName() (string, error) {
-	sessionID, err := GetCurrentSessionID()
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("ScrapeBlockerMutex_Session_%d", sessionID), nil
-}
-
-func checkForDuplicateInstance() (windows.Handle, error) {
-	mutexName, err := getSessionMutexName()
-	if err != nil {
-		return 0, err
-	}
-	mutexHandle, err := windows.CreateMutex(nil, false, windows.StringToUTF16Ptr(mutexName))
-	if err != nil {
-		return 0, err
-	}
-	if err = windows.GetLastError(); err == windows.ERROR_ALREADY_EXISTS {
-		return 0, fmt.Errorf("another instance of the application is already running in this session")
-	}
-	return mutexHandle, nil
-}
-
 func main() {
-	mutexHandle, err := checkForDuplicateInstance()
+	systemManager := services.NewWindowsSystemManager()
+
+	mutexHandle, err := systemManager.CheckForDuplicateInstance()
 	if err != nil {
 		fmt.Printf("Application already running: %v\n", err)
 		return
 	}
 	defer windows.CloseHandle(mutexHandle)
 
-	err = enableDebugPrivilege()
+	err = systemManager.EnableDebugPrivilege()
 	if err != nil {
 		fmt.Printf("Error enabling debug privilege: %v\n", err)
 		return
