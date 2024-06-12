@@ -9,42 +9,40 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+type ProcessInfo struct {
+	Name string
+	ID   uint32
+}
+
 type ApplicationManager interface {
 	BlockApplication(processName string) error
 	UnblockApplication(processName string) error
 	SuspendProcess(handle windows.Handle) error
 	ResumeProcess(handle windows.Handle) error
-	ListApplications() ([]string, error)
-	Intersect(a, b []string) []string
-	EqualStringSlices(a, b []string) bool
+	ListApplications() ([]ProcessInfo, error)
+	Intersect(a, b []ProcessInfo) []ProcessInfo
+	EqualProcessSlices(a, b []ProcessInfo) bool
 	GetProcessHandles(processName string) ([]windows.Handle, error)
 	GetProcessSessionID(processID uint32) (uint32, error)
 }
 
 type windowsApplicationManager struct {
-	mu sync.Mutex
+	mu            sync.Mutex
+	systemManager SystemManager
 }
 
-func NewWindowsApplicationManager() ApplicationManager {
-	return &windowsApplicationManager{}
-}
-
-func GetCurrentSessionID() (uint32, error) {
-	var sessionID uint32
-	processID := windows.GetCurrentProcessId()
-	err := windows.ProcessIdToSessionId(processID, &sessionID)
-	if err != nil {
-		return 0, err
-	}
-	return sessionID, nil
+func NewWindowsApplicationManager(systemManager SystemManager) ApplicationManager {
+	return &windowsApplicationManager{systemManager: systemManager}
 }
 
 func suspendProcess(handle windows.Handle) error {
 	color.Red("Suspendiendo proceso")
 	ntSuspendProcess := windows.NewLazySystemDLL("ntdll.dll").NewProc("NtSuspendProcess")
-	_, _, err := ntSuspendProcess.Call(uintptr(handle))
-	if err != nil && err.Error() != "The operation completed successfully." {
-		return fmt.Errorf("failed to suspend process: %v", err)
+	r1, _, e1 := ntSuspendProcess.Call(uintptr(handle))
+	if r1 != 0 {
+		if e1 != nil && e1 != windows.ERROR_SUCCESS {
+			return fmt.Errorf("failed to suspend process: %v", e1)
+		}
 	}
 	return nil
 }
@@ -52,14 +50,16 @@ func suspendProcess(handle windows.Handle) error {
 func resumeProcess(handle windows.Handle) error {
 	color.Green("Reanudando proceso")
 	ntResumeProcess := windows.NewLazySystemDLL("ntdll.dll").NewProc("NtResumeProcess")
-	_, _, err := ntResumeProcess.Call(uintptr(handle))
-	if err != nil && err.Error() != "The operation completed successfully." {
-		return fmt.Errorf("failed to resume process: %v", err)
+	r1, _, e1 := ntResumeProcess.Call(uintptr(handle))
+	if r1 != 0 {
+		if e1 != nil && e1 != windows.ERROR_SUCCESS {
+			return fmt.Errorf("failed to resume process: %v", e1)
+		}
 	}
 	return nil
 }
 
-func getProcessHandles(processName string) ([]windows.Handle, error) {
+func getProcessHandles(systemManager SystemManager, processName string) ([]windows.Handle, error) {
 	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func getProcessHandles(processName string) ([]windows.Handle, error) {
 	var entry windows.ProcessEntry32
 	entry.Size = uint32(unsafe.Sizeof(entry))
 	var handles []windows.Handle
-	currentSessionID, err := GetCurrentSessionID()
+	currentSessionID, err := systemManager.GetCurrentSessionID()
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +87,10 @@ func getProcessHandles(processName string) ([]windows.Handle, error) {
 			if sessionID == currentSessionID {
 				handle, err := windows.OpenProcess(windows.PROCESS_SUSPEND_RESUME|windows.PROCESS_QUERY_INFORMATION, false, entry.ProcessID)
 				if err != nil {
+					fmt.Printf("Error opening process %d: %v\n", entry.ProcessID, err)
 					continue
 				}
+				fmt.Printf("Found process %s (PID: %d) in current session.\n", processName, entry.ProcessID)
 				handles = append(handles, handle)
 			}
 		}
@@ -101,7 +103,7 @@ func getProcessHandles(processName string) ([]windows.Handle, error) {
 	return handles, nil
 }
 
-func (s *windowsApplicationManager) ListApplications() ([]string, error) {
+func (s *windowsApplicationManager) ListApplications() ([]ProcessInfo, error) {
 	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return nil, err
@@ -110,9 +112,9 @@ func (s *windowsApplicationManager) ListApplications() ([]string, error) {
 
 	var entry windows.ProcessEntry32
 	entry.Size = uint32(unsafe.Sizeof(entry))
-	var apps []string
+	var apps []ProcessInfo
 
-	currentSessionID, err := GetCurrentSessionID()
+	currentSessionID, err := s.systemManager.GetCurrentSessionID()
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +130,7 @@ func (s *windowsApplicationManager) ListApplications() ([]string, error) {
 			continue
 		}
 		if sessionID == currentSessionID {
-			apps = append(apps, windows.UTF16ToString(entry.ExeFile[:]))
+			apps = append(apps, ProcessInfo{Name: windows.UTF16ToString(entry.ExeFile[:]), ID: uint32(entry.ProcessID)})
 		}
 	}
 
@@ -143,11 +145,12 @@ func (s *windowsApplicationManager) BlockApplication(processName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	fmt.Printf("Attempting to block process: %s\n", processName)
-	handles, err := getProcessHandles(processName)
+	handles, err := getProcessHandles(s.systemManager, processName)
 	if err != nil {
 		return err
 	}
 	for _, handle := range handles {
+		fmt.Printf("Suspending process handle: %v\n", handle)
 		err := suspendProcess(handle)
 		if err != nil {
 			fmt.Printf("Failed to block process %s: %v\n", processName, err)
@@ -161,11 +164,12 @@ func (s *windowsApplicationManager) UnblockApplication(processName string) error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	fmt.Printf("Attempting to unblock process: %s\n", processName)
-	handles, err := getProcessHandles(processName)
+	handles, err := getProcessHandles(s.systemManager, processName)
 	if err != nil {
 		return err
 	}
 	for _, handle := range handles {
+		fmt.Printf("Resuming process handle: %v\n", handle)
 		err := resumeProcess(handle)
 		if err != nil {
 			fmt.Printf("Failed to unblock process %s: %v\n", processName, err)
@@ -183,31 +187,30 @@ func (s *windowsApplicationManager) ResumeProcess(handle windows.Handle) error {
 	return resumeProcess(handle)
 }
 
-func (s *windowsApplicationManager) Intersect(a, b []string) []string {
+func (s *windowsApplicationManager) Intersect(a, b []ProcessInfo) []ProcessInfo {
 	m := make(map[string]bool)
-	for _, item := range a {
-		m[item] = true
-	}
-	var result []string
 	for _, item := range b {
-		if _, ok := m[item]; ok {
+		m[item.Name] = true
+	}
+	var result []ProcessInfo
+	for _, item := range a {
+		if _, ok := m[item.Name]; ok {
 			result = append(result, item)
 		}
 	}
 	return result
 }
 
-func (s *windowsApplicationManager) EqualStringSlices(a, b []string) bool {
+func (s *windowsApplicationManager) EqualProcessSlices(a, b []ProcessInfo) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	m := make(map[string]int)
+	m := make(map[uint32]ProcessInfo)
 	for _, item := range a {
-		m[item]++
+		m[item.ID] = item
 	}
 	for _, item := range b {
-		m[item]--
-		if m[item] < 0 {
+		if _, ok := m[item.ID]; !ok {
 			return false
 		}
 	}
@@ -215,7 +218,7 @@ func (s *windowsApplicationManager) EqualStringSlices(a, b []string) bool {
 }
 
 func (s *windowsApplicationManager) GetProcessHandles(processName string) ([]windows.Handle, error) {
-	return getProcessHandles(processName)
+	return getProcessHandles(s.systemManager, processName)
 }
 
 func (s *windowsApplicationManager) GetProcessSessionID(processID uint32) (uint32, error) {

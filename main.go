@@ -46,10 +46,10 @@ func main() {
 		return
 	}
 
-	systray.Run(onReady, onExit)
+	systray.Run(func() { onReady(systemManager) }, onExit)
 }
 
-func onReady() {
+func onReady(systemManager services.SystemManager) {
 	iconData, err := getIcon("icono.ico")
 	if err != nil {
 		fmt.Printf("Error loading icon: %v\n", err)
@@ -67,14 +67,14 @@ func onReady() {
 		return
 	}
 
-	go func() {
+	go func(systemManager services.SystemManager) {
 		chromeService := services.NewChromeService("https://apps.mypurecloud.com")
-		appManager := services.NewWindowsApplicationManager()
+		appManager := services.NewWindowsApplicationManager(systemManager)
 
 		selectors := []string{"Finalizar llamada"}
 		processesToMonitor := config.Processes
 
-		var previousMatchingProcesses []string
+		var previousMatchingProcesses []services.ProcessInfo
 		var previousShouldBlock bool
 
 		for {
@@ -99,31 +99,33 @@ func onReady() {
 				continue
 			}
 
-			matchingProcesses := appManager.Intersect(activeProcesses, processesToMonitor)
+			matchingProcesses := appManager.Intersect(activeProcesses, convertProcessNamesToProcessInfo(processesToMonitor))
 			fmt.Printf("Procesos coincidentes: %v\n", matchingProcesses)
 
 			// Check for changes in matching processes or shouldBlock state
-			if !appManager.EqualStringSlices(matchingProcesses, previousMatchingProcesses) || shouldBlock != previousShouldBlock {
+			if !appManager.EqualProcessSlices(matchingProcesses, previousMatchingProcesses) || shouldBlock != previousShouldBlock {
 				for _, process := range matchingProcesses {
-					handles, err := appManager.GetProcessHandles(process)
+					handles, err := appManager.GetProcessHandles(process.Name)
 					if err != nil {
-						fmt.Printf("Error getting handles for %s: %v\n", process, err)
+						fmt.Printf("Error getting handles for %s: %v\n", process.Name, err)
 						continue
 					}
 					for _, handle := range handles {
 						if shouldBlock {
+							fmt.Printf("Attempting to suspend process %s with handle %v\n", process.Name, handle)
 							err := appManager.SuspendProcess(handle)
 							if err != nil {
-								fmt.Printf("Error suspending process %s: %v\n", process, err)
+								fmt.Printf("Error suspending process %s: %v\n", process.Name, err)
 							} else {
-								fmt.Printf("Process %s suspended.\n", process)
+								fmt.Printf("Process %s suspended.\n", process.Name)
 							}
 						} else {
+							fmt.Printf("Attempting to resume process %s with handle %v\n", process.Name, handle)
 							err := appManager.ResumeProcess(handle)
 							if err != nil {
-								fmt.Printf("Error resuming process %s: %v\n", process, err)
+								fmt.Printf("Error resuming process %s: %v\n", process.Name, err)
 							} else {
-								fmt.Printf("Process %s resumed.\n", process)
+								fmt.Printf("Process %s resumed.\n", process.Name)
 							}
 						}
 					}
@@ -134,7 +136,7 @@ func onReady() {
 
 			time.Sleep(2 * time.Second)
 		}
-	}()
+	}(systemManager)
 
 	<-mStatus.ClickedCh
 }
@@ -148,4 +150,12 @@ func getIcon(path string) ([]byte, error) {
 		return nil, err
 	}
 	return icon, nil
+}
+
+func convertProcessNamesToProcessInfo(processNames []string) []services.ProcessInfo {
+	var processInfos []services.ProcessInfo
+	for _, name := range processNames {
+		processInfos = append(processInfos, services.ProcessInfo{Name: name})
+	}
+	return processInfos
 }
