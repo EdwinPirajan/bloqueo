@@ -18,6 +18,7 @@ type ApplicationManager interface {
 	Intersect(a, b []string) []string
 	EqualStringSlices(a, b []string) bool
 	GetProcessHandles(processName string) ([]windows.Handle, error)
+	GetProcessSessionID(processID uint32) (uint32, error)
 }
 
 type windowsApplicationManager struct {
@@ -26,6 +27,16 @@ type windowsApplicationManager struct {
 
 func NewWindowsApplicationManager() ApplicationManager {
 	return &windowsApplicationManager{}
+}
+
+func GetCurrentSessionID() (uint32, error) {
+	var sessionID uint32
+	processID := windows.GetCurrentProcessId()
+	err := windows.ProcessIdToSessionId(processID, &sessionID)
+	if err != nil {
+		return 0, err
+	}
+	return sessionID, nil
 }
 
 func suspendProcess(handle windows.Handle) error {
@@ -58,23 +69,33 @@ func getProcessHandles(processName string) ([]windows.Handle, error) {
 	var entry windows.ProcessEntry32
 	entry.Size = uint32(unsafe.Sizeof(entry))
 	var handles []windows.Handle
-
+	currentSessionID, err := GetCurrentSessionID()
+	if err != nil {
+		return nil, err
+	}
 	for {
 		err = windows.Process32Next(snapshot, &entry)
 		if err != nil {
 			break
 		}
 		if windows.UTF16ToString(entry.ExeFile[:]) == processName {
-			handle, err := windows.OpenProcess(windows.PROCESS_SUSPEND_RESUME|windows.PROCESS_QUERY_INFORMATION, false, entry.ProcessID)
+			var sessionID uint32
+			err := windows.ProcessIdToSessionId(uint32(entry.ProcessID), &sessionID)
 			if err != nil {
-				return nil, err
+				continue
 			}
-			handles = append(handles, handle)
+			if sessionID == currentSessionID {
+				handle, err := windows.OpenProcess(windows.PROCESS_SUSPEND_RESUME|windows.PROCESS_QUERY_INFORMATION, false, entry.ProcessID)
+				if err != nil {
+					continue
+				}
+				handles = append(handles, handle)
+			}
 		}
 	}
 
 	if len(handles) == 0 {
-		return nil, fmt.Errorf("no instances of process %s found", processName)
+		return nil, fmt.Errorf("no instances of process %s found in the current session", processName)
 	}
 
 	return handles, nil
@@ -91,16 +112,28 @@ func (s *windowsApplicationManager) ListApplications() ([]string, error) {
 	entry.Size = uint32(unsafe.Sizeof(entry))
 	var apps []string
 
+	currentSessionID, err := GetCurrentSessionID()
+	if err != nil {
+		return nil, err
+	}
+
 	for {
 		err = windows.Process32Next(snapshot, &entry)
 		if err != nil {
 			break
 		}
-		apps = append(apps, windows.UTF16ToString(entry.ExeFile[:]))
+		var sessionID uint32
+		err = windows.ProcessIdToSessionId(uint32(entry.ProcessID), &sessionID)
+		if err != nil {
+			continue
+		}
+		if sessionID == currentSessionID {
+			apps = append(apps, windows.UTF16ToString(entry.ExeFile[:]))
+		}
 	}
 
 	if len(apps) == 0 {
-		return nil, fmt.Errorf("no applications found")
+		return nil, fmt.Errorf("no applications found in the current session")
 	}
 
 	return apps, nil
@@ -183,4 +216,13 @@ func (s *windowsApplicationManager) EqualStringSlices(a, b []string) bool {
 
 func (s *windowsApplicationManager) GetProcessHandles(processName string) ([]windows.Handle, error) {
 	return getProcessHandles(processName)
+}
+
+func (s *windowsApplicationManager) GetProcessSessionID(processID uint32) (uint32, error) {
+	var sessionID uint32
+	err := windows.ProcessIdToSessionId(processID, &sessionID)
+	if err != nil {
+		return 0, err
+	}
+	return sessionID, nil
 }

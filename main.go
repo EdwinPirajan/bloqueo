@@ -18,7 +18,6 @@ type Config struct {
 }
 
 const SE_DEBUG_NAME = "SeDebugPrivilege"
-const MutexName = "Global\\ScrapeBlockerMutex"
 
 func loadConfig(path string) (Config, error) {
 	var config Config
@@ -62,13 +61,35 @@ func enableDebugPrivilege() error {
 	return nil
 }
 
+func GetCurrentSessionID() (uint32, error) {
+	var sessionID uint32
+	processID := windows.GetCurrentProcessId()
+	err := windows.ProcessIdToSessionId(processID, &sessionID)
+	if err != nil {
+		return 0, err
+	}
+	return sessionID, nil
+}
+
+func getSessionMutexName() (string, error) {
+	sessionID, err := GetCurrentSessionID()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("ScrapeBlockerMutex_Session_%d", sessionID), nil
+}
+
 func checkForDuplicateInstance() (windows.Handle, error) {
-	mutexHandle, err := windows.CreateMutex(nil, false, windows.StringToUTF16Ptr(MutexName))
+	mutexName, err := getSessionMutexName()
+	if err != nil {
+		return 0, err
+	}
+	mutexHandle, err := windows.CreateMutex(nil, false, windows.StringToUTF16Ptr(mutexName))
 	if err != nil {
 		return 0, err
 	}
 	if err = windows.GetLastError(); err == windows.ERROR_ALREADY_EXISTS {
-		return 0, fmt.Errorf("another instance of the application is already running")
+		return 0, fmt.Errorf("another instance of the application is already running in this session")
 	}
 	return mutexHandle, nil
 }
