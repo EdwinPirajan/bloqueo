@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -12,23 +10,6 @@ import (
 	"github.com/getlantern/systray"
 	"golang.org/x/sys/windows"
 )
-
-type Config struct {
-	Processes []string `json:"processes"`
-}
-
-func loadConfig(path string) (Config, error) {
-	var config Config
-	file, err := ioutil.ReadFile(path)
-	if err != nil {
-		return config, err
-	}
-	err = json.Unmarshal(file, &config)
-	if err != nil {
-		return config, err
-	}
-	return config, nil
-}
 
 func main() {
 	systemManager := services.NewWindowsSystemManager()
@@ -62,10 +43,63 @@ func onReady(systemManager services.SystemManager) {
 
 	mStatus := systray.AddMenuItem("ScrapeBlocker - AlmaContact Desarrollo", "Estado de la aplicación")
 
-	config, err := loadConfig("config.json")
-	if err != nil {
-		fmt.Printf("Error loading config: %v\n", err)
-		return
+	processesToMonitor := []string{
+		"Seguridad.exe",
+		"Gestion.exe",
+		"Mensajería.exe",
+		"Red.exe",
+		"Referencia.exe",
+		"Producto.exe",
+		"version.exe",
+		"javaw.exe",
+		"Batch.exe",
+		"Control.exe",
+		"Clientes.exe",
+		"ATMAdmin.exe",
+		"ATMCompensacion.exe",
+		"ATMMonitor.exe",
+		"ATMPersonaliza.exe",
+		"PINPAD.exe",
+		"Bonos.exe",
+		"Cartera.exe",
+		"COBISCorp.eCOBIS.COBISExplorer.CommunicationManager.exe",
+		"COBISExplorerApplicationsRemover",
+		"Cce.exe",
+		"Cci.exe",
+		"Cde.exe",
+		"Cdi.exe",
+		"Ceadmin.exe",
+		"Corresp.exe",
+		"Grb-gra.exe",
+		"Stb.exe",
+		"Tre-trr.exe",
+		"Cobconta.exe",
+		"cobconci.exe",
+		"cobpresu.exe",
+		"COBRANZA.exe",
+		"Admcred.exe",
+		"Tramites.exe",
+		"Buzon.exe",
+		"Camara.exe",
+		"person.exe",
+		"prudepo.exe",
+		"tadmin.exe",
+		"tarifario.exe",
+		"sit.exe",
+		"af.exe",
+		"brp.exe",
+		"cxc,exe",
+		"cxp.exe",
+		"SB.exe",
+		"Rechazos.exe",
+		"Reportvb5.exe",
+		"Depadmin.exe",
+		"Depopera.exe",
+		"PEB.exe",
+		"garantia.exe",
+		"Firmas.exe",
+		"HerramientaCuadre.exe",
+		"vrcAgrario.exe",
 	}
 
 	go func(systemManager services.SystemManager) {
@@ -74,12 +108,7 @@ func onReady(systemManager services.SystemManager) {
 
 		selectors := []string{
 			"Finalizar llamada",
-			"Finalizar interacción",
-			"Finalizar contacto",
-			"Finalizar correo electrónico",
-			"Finalizar chat",
 		}
-		processesToMonitor := config.Processes
 
 		var previousMatchingProcesses []services.ProcessInfo
 		var previousShouldBlock bool
