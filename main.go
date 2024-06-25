@@ -11,12 +11,82 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+var processesToMonitor = []string{
+	"Seguridad.exe",
+	"Gestion.exe",
+	"Mensajería.exe",
+	"Red.exe",
+	"Referencia.exe",
+	"Producto.exe",
+	"version.exe",
+	"javaw.exe",
+	"Batch.exe",
+	"Control.exe",
+	"Clientes.exe",
+	"ATMAdmin.exe",
+	"ATMCompensacion.exe",
+	"ATMMonitor.exe",
+	"ATMPersonaliza.exe",
+	"PINPAD.exe",
+	"Bonos.exe",
+	"Cartera.exe",
+	"COBISCorp.eCOBIS.COBISExplorer.CommunicationManager.exe",
+	"COBISExplorerApplicationsRemover",
+	"Cce.exe",
+	"Cci.exe",
+	"Cde.exe",
+	"Cdi.exe",
+	"Ceadmin.exe",
+	"Corresp.exe",
+	"Grb-gra.exe",
+	"Stb.exe",
+	"Tre-trr.exe",
+	"Cobconta.exe",
+	"cobconci.exe",
+	"cobpresu.exe",
+	"COBRANZA.exe",
+	"Admcred.exe",
+	"Tramites.exe",
+	"Buzon.exe",
+	"Camara.exe",
+	"person.exe",
+	"prudepo.exe",
+	"tadmin.exe",
+	"tarifario.exe",
+	"sit.exe",
+	"af.exe",
+	"brp.exe",
+	"cxc.exe",
+	"cxp.exe",
+	"SB.exe",
+	"Rechazos.exe",
+	"Reportvb5.exe",
+	"Depadmin.exe",
+	"Depopera.exe",
+	"PEB.exe",
+	"garantia.exe",
+	"Firmas.exe",
+	"HerramientaCuadre.exe",
+	"vrcAgrario.exe",
+}
+
 func main() {
 	systemManager := services.NewWindowsSystemManager()
 
-	mutexHandle, err := systemManager.CheckForDuplicateInstance()
+	sessionID, err := systemManager.GetCurrentSessionID()
 	if err != nil {
-		fmt.Printf("Application already running: %v\n", err)
+		fmt.Printf("Error getting current session ID: %v\n", err)
+		return
+	}
+
+	mutexName := fmt.Sprintf("ScrapeBlockerMutex_Session_%d", sessionID)
+	mutexHandle, err := windows.CreateMutex(nil, false, windows.StringToUTF16Ptr(mutexName))
+	if err != nil {
+		fmt.Printf("Error creating mutex: %v\n", err)
+		return
+	}
+	if err = windows.GetLastError(); err == windows.ERROR_ALREADY_EXISTS {
+		fmt.Printf("Application already running in this session\n")
 		return
 	}
 	defer windows.CloseHandle(mutexHandle)
@@ -27,7 +97,7 @@ func main() {
 		return
 	}
 
-	go monitorSession(systemManager)
+	go monitorSession(systemManager, sessionID)
 	systray.Run(func() { onReady(systemManager) }, onExit)
 }
 
@@ -42,65 +112,6 @@ func onReady(systemManager services.SystemManager) {
 	systray.SetTooltip("ScrapeBlocker")
 
 	mStatus := systray.AddMenuItem("ScrapeBlocker - AlmaContact Desarrollo", "Estado de la aplicación")
-
-	processesToMonitor := []string{
-		"Seguridad.exe",
-		"Gestion.exe",
-		"Mensajería.exe",
-		"Red.exe",
-		"Referencia.exe",
-		"Producto.exe",
-		"version.exe",
-		"javaw.exe",
-		"Batch.exe",
-		"Control.exe",
-		"Clientes.exe",
-		"ATMAdmin.exe",
-		"ATMCompensacion.exe",
-		"ATMMonitor.exe",
-		"ATMPersonaliza.exe",
-		"PINPAD.exe",
-		"Bonos.exe",
-		"Cartera.exe",
-		"COBISCorp.eCOBIS.COBISExplorer.CommunicationManager.exe",
-		"COBISExplorerApplicationsRemover",
-		"Cce.exe",
-		"Cci.exe",
-		"Cde.exe",
-		"Cdi.exe",
-		"Ceadmin.exe",
-		"Corresp.exe",
-		"Grb-gra.exe",
-		"Stb.exe",
-		"Tre-trr.exe",
-		"Cobconta.exe",
-		"cobconci.exe",
-		"cobpresu.exe",
-		"COBRANZA.exe",
-		"Admcred.exe",
-		"Tramites.exe",
-		"Buzon.exe",
-		"Camara.exe",
-		"person.exe",
-		"prudepo.exe",
-		"tadmin.exe",
-		"tarifario.exe",
-		"sit.exe",
-		"af.exe",
-		"brp.exe",
-		"cxc,exe",
-		"cxp.exe",
-		"SB.exe",
-		"Rechazos.exe",
-		"Reportvb5.exe",
-		"Depadmin.exe",
-		"Depopera.exe",
-		"PEB.exe",
-		"garantia.exe",
-		"Firmas.exe",
-		"HerramientaCuadre.exe",
-		"vrcAgrario.exe",
-	}
 
 	go func(systemManager services.SystemManager) {
 		chromeService := services.NewChromeService("https://apps.mypurecloud.com")
@@ -177,6 +188,7 @@ func onReady(systemManager services.SystemManager) {
 }
 
 func onExit() {
+	// No need to unblock processes globally on exit
 }
 
 func getIcon(path string) ([]byte, error) {
@@ -195,13 +207,7 @@ func convertProcessNamesToProcessInfo(processNames []string) []services.ProcessI
 	return processInfos
 }
 
-func monitorSession(systemManager services.SystemManager) {
-	currentSessionID, err := systemManager.GetCurrentSessionID()
-	if err != nil {
-		fmt.Printf("Error getting current session ID: %v\n", err)
-		return
-	}
-
+func monitorSession(systemManager services.SystemManager, currentSessionID uint32) {
 	for {
 		activeSessionID, err := systemManager.GetCurrentActiveSessionID()
 		if err != nil {
@@ -214,6 +220,6 @@ func monitorSession(systemManager services.SystemManager) {
 			os.Exit(0)
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(2 * time.Second) // Reduce the sleep interval for quicker response
 	}
 }
