@@ -2,15 +2,56 @@ package services
 
 import (
 	"fmt"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
+
+const (
+	WTS_CURRENT_SERVER_HANDLE = 0
+	WTS_CURRENT_SERVER_NAME   = ""
+	WTS_CURRENT_SESSION       = 0xFFFFFFFF
+
+	WTSSessionStateActive = 0x00000000
+	WTSSessionStateLocked = 0x00000005
+)
+
+type WTS_SESSION_INFO struct {
+	SessionId      uint32
+	WinStationName *uint16
+	State          uint32
+}
+
+var (
+	modwtsapi32              = windows.NewLazySystemDLL("wtsapi32.dll")
+	procWTSEnumerateSessions = modwtsapi32.NewProc("WTSEnumerateSessionsW")
+	procWTSFreeMemory        = modwtsapi32.NewProc("WTSFreeMemory")
+)
+
+func WTSEnumerateSessions(serverHandle windows.Handle, reserved, version uint32, sessionInfo **WTS_SESSION_INFO, count *uint32) error {
+	ret, _, err := procWTSEnumerateSessions.Call(
+		uintptr(serverHandle),
+		uintptr(reserved),
+		uintptr(version),
+		uintptr(unsafe.Pointer(sessionInfo)),
+		uintptr(unsafe.Pointer(count)),
+	)
+	if ret == 0 {
+		return err
+	}
+	return nil
+}
+
+func WTSFreeMemory(memory *WTS_SESSION_INFO) {
+	procWTSFreeMemory.Call(uintptr(unsafe.Pointer(memory)))
+}
 
 type SystemManager interface {
 	EnableDebugPrivilege() error
 	GetCurrentSessionID() (uint32, error)
 	GetSessionMutexName() (string, error)
 	CheckForDuplicateInstance() (windows.Handle, error)
+	GetCurrentActiveSessionID() (uint32, error)
 }
 
 type windowsSystemManager struct{}
@@ -79,4 +120,24 @@ func (s *windowsSystemManager) CheckForDuplicateInstance() (windows.Handle, erro
 		return 0, fmt.Errorf("another instance of the application is already running in this session")
 	}
 	return mutexHandle, nil
+}
+
+func (s *windowsSystemManager) GetCurrentActiveSessionID() (uint32, error) {
+	var sessionInfo *WTS_SESSION_INFO
+	var count uint32
+
+	err := WTSEnumerateSessions(WTS_CURRENT_SERVER_HANDLE, 0, 1, &sessionInfo, &count)
+	if err != nil {
+		return 0, err
+	}
+	defer WTSFreeMemory(sessionInfo)
+
+	sessions := unsafe.Slice(sessionInfo, count)
+	for _, session := range sessions {
+		if session.State == WTSSessionStateActive {
+			return session.SessionId, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no active session found")
 }

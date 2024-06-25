@@ -46,6 +46,7 @@ func main() {
 		return
 	}
 
+	go monitorSession(systemManager)
 	systray.Run(func() { onReady(systemManager) }, onExit)
 }
 
@@ -71,7 +72,13 @@ func onReady(systemManager services.SystemManager) {
 		chromeService := services.NewChromeService("https://apps.mypurecloud.com")
 		appManager := services.NewWindowsApplicationManager(systemManager)
 
-		selectors := []string{"Finalizar llamada"}
+		selectors := []string{
+			"Finalizar llamada",
+			"Finalizar interacción",
+			"Finalizar contacto",
+			"Finalizar correo electrónico",
+			"Finalizar chat",
+		}
 		processesToMonitor := config.Processes
 
 		var previousMatchingProcesses []services.ProcessInfo
@@ -102,7 +109,6 @@ func onReady(systemManager services.SystemManager) {
 			matchingProcesses := appManager.Intersect(activeProcesses, convertProcessNamesToProcessInfo(processesToMonitor))
 			fmt.Printf("Procesos coincidentes: %v\n", matchingProcesses)
 
-			// Check for changes in matching processes or shouldBlock state
 			if !appManager.EqualProcessSlices(matchingProcesses, previousMatchingProcesses) || shouldBlock != previousShouldBlock {
 				for _, process := range matchingProcesses {
 					handles, err := appManager.GetProcessHandles(process.Name)
@@ -158,4 +164,27 @@ func convertProcessNamesToProcessInfo(processNames []string) []services.ProcessI
 		processInfos = append(processInfos, services.ProcessInfo{Name: name})
 	}
 	return processInfos
+}
+
+func monitorSession(systemManager services.SystemManager) {
+	currentSessionID, err := systemManager.GetCurrentSessionID()
+	if err != nil {
+		fmt.Printf("Error getting current session ID: %v\n", err)
+		return
+	}
+
+	for {
+		activeSessionID, err := systemManager.GetCurrentActiveSessionID()
+		if err != nil {
+			fmt.Printf("Error getting active session ID: %v\n", err)
+			return
+		}
+
+		if currentSessionID != activeSessionID {
+			fmt.Println("User session has changed. Exiting application.")
+			os.Exit(0)
+		}
+
+		time.Sleep(5 * time.Second)
+	}
 }
