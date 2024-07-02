@@ -67,7 +67,7 @@ func getIcon(path string) ([]byte, error) {
 }
 
 func monitorProcesses(systemManager services.SystemManager) {
-	chromeService := services.NewChromeService("https://apps.mypurecloud.com")
+	chromeService := services.NewChromeService("", systemManager)
 	appManager := services.NewWindowsApplicationManager(systemManager)
 
 	selectors := []string{"Finalizar llamada"}
@@ -77,8 +77,18 @@ func monitorProcesses(systemManager services.SystemManager) {
 
 	for {
 		shouldBlock := false
+		var htmlContent string
+		var err error
 
-		htmlContent, err := chromeService.GetFullPageHTML()
+		for attempt := 0; attempt < 5; attempt++ {
+			htmlContent, err = chromeService.GetFullPageHTML()
+			if err == nil {
+				break
+			}
+			log.Printf("Attempt %d: Error getting full page HTML: %v\n", attempt+1, err)
+			time.Sleep(2 * time.Second)
+		}
+
 		if err != nil {
 			log.Printf("Error: %v\n", err)
 			shouldBlock = true
