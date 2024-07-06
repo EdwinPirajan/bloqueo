@@ -3,9 +3,8 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
-	"time"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -17,29 +16,17 @@ type ChromeService interface {
 }
 
 type chromeServiceImpl struct {
-	conn          *websocket.Conn
-	urlToMonitor  string
-	systemManager SystemManager
+	conn         *websocket.Conn
+	urlToMonitor string
 }
 
-func NewChromeService(urlToMonitor string, systemManager SystemManager) ChromeService {
-	return &chromeServiceImpl{urlToMonitor: urlToMonitor, systemManager: systemManager}
+func NewChromeService(urlToMonitor string) ChromeService {
+	return &chromeServiceImpl{urlToMonitor: urlToMonitor}
 }
 
 func (s *chromeServiceImpl) Connect() error {
 	url := "http://localhost:9222/json"
-	var resp *http.Response
-	var err error
-
-	// Retry logic for connection
-	for i := 0; i < 5; i++ {
-		resp, err = http.Get(url)
-		if err == nil {
-			break
-		}
-		log.Printf("Error connecting to Chrome DevTools, retrying... (%d/5)\n", i+1)
-		time.Sleep(2 * time.Second)
-	}
+	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("error connecting to Chrome DevTools: %v", err)
 	}
@@ -50,20 +37,24 @@ func (s *chromeServiceImpl) Connect() error {
 		return fmt.Errorf("error decoding targets: %v", err)
 	}
 
+	var wsURL string
 	for _, target := range targets {
-		if target["type"] == "page" {
-			wsURL := target["webSocketDebuggerUrl"].(string)
-			conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-			if err == nil {
-				s.conn = conn
-				log.Printf("Connected to WebSocket for target %s\n", target["url"])
-				return nil
-			}
-			log.Printf("Error connecting to WebSocket for target %s: %v\n", target["url"], err)
+		if target["type"] == "page" && strings.Contains(target["url"].(string), s.urlToMonitor) {
+			wsURL = target["webSocketDebuggerUrl"].(string)
+			break
 		}
 	}
 
-	return fmt.Errorf("no suitable tab found")
+	if wsURL == "" {
+		return fmt.Errorf("no suitable tab found with URL containing: %s", s.urlToMonitor)
+	}
+
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		return fmt.Errorf("error connecting to WebSocket: %v", err)
+	}
+	s.conn = conn
+	return nil
 }
 
 func (s *chromeServiceImpl) Close() {
