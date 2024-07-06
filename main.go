@@ -72,7 +72,10 @@ func monitorProcesses(systemManager services.SystemManager) {
 
 	selectors := []string{
 		"Finalizar llamada",
+		//chat(linea virtual, wpp, messenger)
 		"sms-textarea message-input form-control",
+		//mail
+		"interaction-icon roster-email ember-view",
 	}
 
 	var previousMatchingProcesses []services.ProcessInfo
