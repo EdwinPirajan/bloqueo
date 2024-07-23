@@ -14,7 +14,7 @@ var processesToMonitor = []string{
 	"Seguridad.exe", "Gestion.exe", "Mensajería.exe", "Red.exe", "Referencia.exe",
 	"Producto.exe", "version.exe", "javaw.exe", "Batch.exe", "Control.exe",
 	"Clientes.exe", "ATMAdmin.exe", "ATMCompensacion.exe", "ATMMonitor.exe", "ATMPersonaliza.exe",
-	"PINPAD.exe", "Bonos.exe", "Cartera.exe", "COBISCorp.eCOBIS.COBISExplorer.CommunicationManager.exe",
+	"PINPAD.exe", "Bonos.exe", "cartera.exe", "COBISCorp.eCOBIS.COBISExplorer.CommunicationManager.exe",
 	"COBISExplorerApplicationsRemover", "Cce.exe", "Cci.exe", "Cde.exe", "Cdi.exe", "Ceadmin.exe",
 	"Corresp.exe", "Grb-gra.exe", "Stb.exe", "Tre-trr.exe", "Cobconta.exe", "cobconci.exe", "cobpresu.exe",
 	"COBRANZA.exe", "Admcred.exe", "Tramites.exe", "Buzon.exe", "Camara.exe", "person.exe", "prudepo.exe",
@@ -46,7 +46,7 @@ func onReady(systemManager services.SystemManager) func() {
 		systray.SetTitle("ScrapeBlocker")
 		systray.SetTooltip("ScrapeBlocker")
 
-		mStatus := systray.AddMenuItem("ScrapeBlocker - AlmaContact Desarrollo", "Estado de la aplicación")
+		mStatus := systray.AddMenuItem("ScrapeBlocker V1.05 - AlmaContact Desarrollo", "Estado de la aplicación")
 
 		go monitorProcesses(systemManager)
 
