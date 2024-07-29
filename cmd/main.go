@@ -3,7 +3,9 @@ package main
 import (
 	"log"
 
-	"github.com/EdwinPirajan/bloqueo.git/services"
+	"github.com/EdwinPirajan/bloqueo.git/internal/config"
+	"github.com/EdwinPirajan/bloqueo.git/internal/core/ports"
+	"github.com/EdwinPirajan/bloqueo.git/internal/core/services"
 	"github.com/getlantern/systray"
 )
 
@@ -21,18 +23,23 @@ var processesToMonitor = []string{
 }
 
 func main() {
-	systemManager := services.NewWindowsSystemManager()
-
-	err := systemManager.EnableDebugPrivilege()
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Printf("Error enabling debug privilege: %v\n", err)
-		return
+		log.Fatalf("Error loading config: %v", err)
 	}
 
-	systray.Run(onReady(systemManager), onExit)
+	systemManager := services.NewWindowsSystemManager()
+	err = systemManager.EnableDebugPrivilege()
+	if err != nil {
+		log.Fatalf("Error enabling debug privilege: %v", err)
+	}
+
+	updateService := services.NewUpdateService(cfg, systemManager)
+
+	systray.Run(onReady(systemManager, updateService), onExit)
 }
 
-func onReady(systemManager services.SystemManager) func() {
+func onReady(systemManager services.SystemManager, updateService ports.UpdateService) func() {
 	return func() {
 		iconData, err := services.GetIcon("resources/icono.ico")
 		if err != nil {
@@ -46,11 +53,11 @@ func onReady(systemManager services.SystemManager) func() {
 		mStatus := systray.AddMenuItem("ScrapeBlocker V1.06 - AlmaContact Desarrollo", "Estado de la aplicación")
 
 		go services.MonitorProcesses(systemManager, processesToMonitor)
+		go updateService.CheckForUpdates()
 
 		<-mStatus.ClickedCh
 	}
 }
 
 func onExit() {
-
 }
