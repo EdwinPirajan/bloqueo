@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-const CurrentVersion = "1.0.5"
+const CurrentVersion = "1.0.6"
 
 type Config struct {
 	UpdateCheckURL string `json:"update_check_url"`
