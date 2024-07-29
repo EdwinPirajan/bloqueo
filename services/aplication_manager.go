@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"sync"
 	"unsafe"
 
 	"github.com/fatih/color"
@@ -24,7 +23,6 @@ type ApplicationManager interface {
 }
 
 type windowsApplicationManager struct {
-	mu            sync.Mutex
 	systemManager SystemManager
 }
 
