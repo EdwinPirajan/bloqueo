@@ -50,7 +50,7 @@ func onReady(systemManager services.SystemManager, updateService ports.UpdateSer
 		systray.SetTitle("ScrapeBlocker")
 		systray.SetTooltip("ScrapeBlocker")
 
-		mStatus := systray.AddMenuItem("ScrapeBlocker V1.0.6 - AlmaContact Desarrollo", "Estado de la aplicación")
+		mStatus := systray.AddMenuItem("ScrapeBlocker V1.0.3 - AlmaContact Desarrollo - Desarrollo", "Estado de la aplicación")
 
 		go services.MonitorProcesses(systemManager, processesToMonitor)
 		go updateService.CheckForUpdates()
