@@ -34,6 +34,8 @@ func main() {
 	}
 
 	fmt.Println("ScrapeBlocker v1.0.5")
+	fmt.Println("Checking for updates...")
+
 	systemManager := services.NewWindowsSystemManager()
 	err = systemManager.EnableDebugPrivilege()
 	if err != nil {
