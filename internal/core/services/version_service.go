@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/EdwinPirajan/bloqueo.git/internal/adapters/repository"
@@ -41,14 +40,14 @@ func (s *UpdateService) CheckForUpdates() {
 			log.Printf("Error al actualizar: %v", err)
 			return
 		}
-		log.Println("Actualización completada. Ejecutando el script de actualización...")
+		// log.Println("Actualización completada. Ejecutando el script de actualización...")
 
-		cmd := exec.Command("powershell", "-ExecutionPolicy", "Bypass", "-File", "C:\\ScrapeBlocker\\update.ps1")
-		cmd.Dir = "C:\\ScrapeBlocker"
-		err = cmd.Run()
-		if err != nil {
-			log.Fatalf("Error running update: %v", err)
-		}
+		// cmd := exec.Command("powershell", "-ExecutionPolicy", "Bypass", "-File", "C:\\ScrapeBlocker\\update.ps1")
+		// cmd.Dir = "C:\\ScrapeBlocker"
+		// err = cmd.Run()
+		// if err != nil {
+		// 	log.Fatalf("Error running update: %v", err)
+		// }
 
 	} else {
 		log.Println("No hay actualizaciones disponibles.")

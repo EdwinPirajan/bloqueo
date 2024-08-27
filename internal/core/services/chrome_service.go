@@ -13,6 +13,7 @@ type ChromeService interface {
 	Connect() error
 	GetFullPageHTML() (string, error)
 	Close()
+	GetCurrentURL() (string, error)
 }
 
 type chromeServiceImpl struct {
@@ -128,4 +129,42 @@ func (s *chromeServiceImpl) GetFullPageHTML() (string, error) {
 
 	fmt.Println("Contenido HTML de la página obtenido exitosamente")
 	return htmlContent, nil
+}
+
+func (s *chromeServiceImpl) GetCurrentURL() (string, error) {
+	err := s.Connect()
+	if err != nil {
+		return "", err
+	}
+	defer s.Close()
+
+	request := map[string]interface{}{
+		"id":     3,
+		"method": "Runtime.evaluate",
+		"params": map[string]interface{}{
+			"expression": "window.location.href",
+		},
+	}
+
+	if err := s.conn.WriteJSON(request); err != nil {
+		return "", fmt.Errorf("error sending command: %v", err)
+	}
+
+	var response map[string]interface{}
+	if err := s.conn.ReadJSON(&response); err != nil {
+		return "", fmt.Errorf("error reading response: %v", err)
+	}
+
+	result, ok := response["result"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("unexpected response format: %v", response)
+	}
+
+	value, ok := result["value"].(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected value format: %v", result)
+	}
+
+	fmt.Println("URL actual obtenida exitosamente")
+	return value, nil
 }
