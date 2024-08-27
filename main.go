@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/EdwinPirajan/bloqueo.git/internal/config"
@@ -32,6 +33,7 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
+	fmt.Println("ScrapeBlocker v1.0.5")
 	systemManager := services.NewWindowsSystemManager()
 	err = systemManager.EnableDebugPrivilege()
 	if err != nil {
