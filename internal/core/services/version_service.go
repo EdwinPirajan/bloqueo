@@ -38,12 +38,18 @@ func (s *UpdateService) CheckForUpdates() {
 		log.Println("Nueva versión disponible. Actualizando...")
 		err := s.downloadAndUpdate(versionInfo.URL)
 		if err != nil {
-			// panic(err)
 			log.Printf("Error al actualizar: %v", err)
 			return
 		}
-		log.Println("Actualización completada. Reiniciando...")
-		s.restartApplication()
+		log.Println("Actualización completada. Ejecutando el script de actualización...")
+
+		cmd := exec.Command("powershell", "-ExecutionPolicy", "Bypass", "-File", "C:\\ScrapeBlocker\\update.ps1")
+		cmd.Dir = "C:\\ScrapeBlocker"
+		err = cmd.Run()
+		if err != nil {
+			log.Fatalf("Error running update: %v", err)
+		}
+
 	} else {
 		log.Println("No hay actualizaciones disponibles.")
 	}
@@ -56,7 +62,6 @@ func (s *UpdateService) downloadAndUpdate(url string) error {
 	}
 	defer resp.Body.Close()
 
-	// Crear archivo temporal para la nueva versión
 	tempFile, err := os.CreateTemp("", "update-*.zip")
 	if err != nil {
 		return err
@@ -68,7 +73,6 @@ func (s *UpdateService) downloadAndUpdate(url string) error {
 		return err
 	}
 
-	// Descomprimir y reemplazar archivos
 	err = s.unzip(tempFile.Name(), ".")
 	if err != nil {
 		return err
@@ -118,12 +122,12 @@ func (s *UpdateService) unzip(src, dest string) error {
 	return nil
 }
 
-func (s *UpdateService) restartApplication() {
-	executable, err := os.Executable()
-	if err != nil {
-		log.Fatalf("Error al obtener el ejecutable: %v", err)
-	}
-	cmd := exec.Command(executable)
-	cmd.Start()
-	os.Exit(0)
-}
+// func (s *UpdateService) restartApplication() {
+// 	executable, err := os.Executable()
+// 	if err != nil {
+// 		log.Fatalf("Error al obtener el ejecutable: %v", err)
+// 	}
+// 	cmd := exec.Command(executable)
+// 	cmd.Start()
+// 	os.Exit(0)
+// }
