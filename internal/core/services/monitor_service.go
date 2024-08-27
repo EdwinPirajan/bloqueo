@@ -6,16 +6,10 @@ import (
 	"time"
 )
 
-var urlsToBlock = []string{
-	"https://www.ejemplo.com",
-	"https://www.otroejemplo.com",
-}
-
-func MonitorProcesses(systemManager SystemManager, processesToMonitor []string) {
+func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, urlsToBlock []string) {
 	chromeService := NewChromeService("https://apps.mypurecloud.com")
 	appManager := NewWindowsApplicationManager(systemManager)
 
-	// Selectores HTML a verificar en la página de PureCloud
 	selectors := []string{
 		"Finalizar llamada",
 		"sms-textarea message-input form-control",
@@ -26,45 +20,37 @@ func MonitorProcesses(systemManager SystemManager, processesToMonitor []string) 
 	var previousShouldBlock bool
 
 	for {
-		shouldBlock := false
+		shouldBlock := true
 
-		// Obtener la URL actual
-		currentURL, err := chromeService.GetCurrentURL()
+		// Obtener el HTML completo de la página
+		htmlContent, err := chromeService.GetFullPageHTML()
 		if err != nil {
-			log.Printf("Error obteniendo URL actual: %v\n", err)
+			log.Printf("Error obteniendo el HTML de la página: %v\n", err)
 			shouldBlock = true
 		} else {
-			// Verificar si la URL actual es una de las URLs a bloquear
-			for _, url := range urlsToBlock {
-				if strings.Contains(currentURL, url) {
-					log.Printf("La URL %s está abierta y será bloqueada.\n", url)
-					shouldBlock = true
+			// Verificar si alguno de los selectores está presente en la página
+			for _, selector := range selectors {
+				if strings.Contains(htmlContent, selector) {
+					shouldBlock = false
 					break
-				}
-			}
-
-			// Si la URL actual es la de PureCloud, verificar los selectores
-			if strings.Contains(currentURL, "https://apps.mypurecloud.com") {
-				htmlContent, err := chromeService.GetFullPageHTML()
-				if err != nil {
-					log.Printf("Error obteniendo HTML de la página: %v\n", err)
-					shouldBlock = true
-				} else {
-					for _, selector := range selectors {
-						if strings.Contains(htmlContent, selector) {
-							shouldBlock = true
-							log.Printf("El selector %s fue encontrado en la URL %s.\n", selector, currentURL)
-							break
-						}
-					}
 				}
 			}
 		}
 
-		// Suspender o reanudar procesos según sea necesario
+		// Si no se encuentran los selectores, cerrar la conexión con las páginas bloqueadas
+		if shouldBlock {
+			err := chromeService.CloseTabsWithURLs(urlsToBlock)
+			if err != nil {
+				log.Printf("Error cerrando la conexión con las URLs: %v\n", err)
+			}
+		} else {
+			log.Printf("Selectores encontrados, se permite la interacción en las URLs bloqueadas.")
+		}
+
+		// Monitorear procesos activos (mantiene la lógica original)
 		activeProcesses, err := appManager.ListApplicationsInCurrentSession()
 		if err != nil {
-			log.Printf("Error al listar aplicaciones: %v\n", err)
+			log.Printf("Error listando las aplicaciones: %v\n", err)
 			continue
 		}
 
@@ -75,7 +61,7 @@ func MonitorProcesses(systemManager SystemManager, processesToMonitor []string) 
 			for _, process := range matchingProcesses {
 				handles, err := appManager.GetProcessHandlesInCurrentSession(process.Name)
 				if err != nil {
-					log.Printf("Error obteniendo manejos para %s: %v\n", process.Name, err)
+					log.Printf("Error obteniendo los manejadores del proceso %s: %v\n", process.Name, err)
 					continue
 				}
 				for _, handle := range handles {
@@ -83,7 +69,7 @@ func MonitorProcesses(systemManager SystemManager, processesToMonitor []string) 
 						log.Printf("Intentando suspender el proceso %s con el manejador %v\n", process.Name, handle)
 						err := appManager.SuspendProcess(handle)
 						if err != nil {
-							log.Printf("Error al suspender el proceso %s: %v\n", process.Name, err)
+							log.Printf("Error suspendiendo el proceso %s: %v\n", process.Name, err)
 						} else {
 							log.Printf("Proceso %s suspendido.\n", process.Name)
 						}
@@ -91,7 +77,7 @@ func MonitorProcesses(systemManager SystemManager, processesToMonitor []string) 
 						log.Printf("Intentando reanudar el proceso %s con el manejador %v\n", process.Name, handle)
 						err := appManager.ResumeProcess(handle)
 						if err != nil {
-							log.Printf("Error al reanudar el proceso %s: %v\n", process.Name, err)
+							log.Printf("Error reanudando el proceso %s: %v\n", process.Name, err)
 						} else {
 							log.Printf("Proceso %s reanudado.\n", process.Name)
 						}

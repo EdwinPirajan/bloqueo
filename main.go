@@ -22,6 +22,10 @@ var processesToMonitor = []string{
 	"HerramientaCuadre.exe", "vrcAgrario.exe",
 }
 
+var urlsToBlock = []string{
+	"www.almacontact.com.co",
+}
+
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -52,7 +56,7 @@ func onReady(systemManager services.SystemManager, updateService ports.UpdateSer
 
 		mStatus := systray.AddMenuItem("test", "test")
 
-		go services.MonitorProcesses(systemManager, processesToMonitor)
+		go services.MonitorProcesses(systemManager, processesToMonitor, urlsToBlock)
 		go updateService.CheckForUpdates()
 
 		<-mStatus.ClickedCh
