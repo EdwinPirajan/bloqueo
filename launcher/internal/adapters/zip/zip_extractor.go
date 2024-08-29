@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // ZipExtractor implementa la interfaz ZipExtractor
@@ -79,21 +79,20 @@ func (ze *ZipExtractor) Extract(zipPath, destDir string) error {
 	// Log de confirmación de extracción completada
 	fmt.Println("Todos los archivos se han extraído correctamente.")
 
-	// Intentar eliminar el archivo ZIP varias veces
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		// Esperar un breve momento antes de intentar eliminar
-		time.Sleep(1 * time.Second)
+	return nil
+}
 
-		err = os.Remove(zipPath)
-		if err == nil {
-			// Log de confirmación de eliminación del archivo ZIP
-			fmt.Println("Archivo ZIP eliminado correctamente.")
-			return nil
-		}
+func (ze *ZipExtractor) DeleteZip(zipPath string) error {
+	batPath := "C:\\ScrapeBlocker\\config\\deletezip.bat"
+	cmd := exec.Command("cmd.exe", "/C", batPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
-		fmt.Printf("Intento %d: Error eliminando el archivo ZIP: %v\n", i+1, err)
+	err := cmd.Run() // Corrección: `err` estaba siendo usado antes de ser declarado
+	if err != nil {
+		return fmt.Errorf("error ejecutando el archivo .bat: %v", err)
 	}
 
-	return fmt.Errorf("error eliminando el archivo ZIP después de varios intentos: %v", err)
+	fmt.Println("Archivo .bat ejecutado correctamente.")
+	return nil // Se agregó el retorno `nil` para indicar que no hubo errores
 }

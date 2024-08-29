@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -9,15 +10,19 @@ import (
 )
 
 type HTTPCheckService struct {
-	url string
+	baseURL string
 }
 
-func NewHTTPCheckService(url string) *HTTPCheckService {
-	return &HTTPCheckService{url: url}
+func NewHTTPCheckService(baseURL string) *HTTPCheckService {
+	return &HTTPCheckService{baseURL: baseURL}
 }
 
-func (hcs *HTTPCheckService) CheckForUpdates() (*domain.CheckResponse, error) {
-	resp, err := http.Get(hcs.url)
+// CheckForUpdates implementa la interfaz CheckService
+func (hcs *HTTPCheckService) CheckForUpdates(client string) (*domain.CheckResponse, error) {
+	// Construir la URL con el parámetro del cliente
+	url := fmt.Sprintf("%s?client=%s", hcs.baseURL, client)
+
+	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}

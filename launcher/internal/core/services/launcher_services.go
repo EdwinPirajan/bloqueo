@@ -24,15 +24,15 @@ func NewLauncherService(cs ports.CheckService, fs ports.FileStorage, sr ports.Sc
 	}
 }
 
-func (ls *LauncherService) Launch() error {
+func (ls *LauncherService) Launch(client string) error {
 	// Leer config.json
 	localConfig, err := ls.fileStorage.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("error cargando config.json: %v", err)
 	}
 
-	// Hacer la petición HTTP
-	checkResponse, err := ls.checkService.CheckForUpdates()
+	// Hacer la petición HTTP usando el client
+	checkResponse, err := ls.checkService.CheckForUpdates(client)
 	if err != nil {
 		return fmt.Errorf("error realizando la petición: %v", err)
 	}
