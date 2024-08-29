@@ -3,8 +3,6 @@ package main
 import (
 	"log"
 
-	"github.com/EdwinPirajan/bloqueo.git/internal/config"
-	"github.com/EdwinPirajan/bloqueo.git/internal/core/ports"
 	"github.com/EdwinPirajan/bloqueo.git/internal/core/services"
 	"github.com/getlantern/systray"
 )
@@ -21,29 +19,20 @@ var processesToMonitor = []string{
 	"Rechazos.exe", "Reportvb5.exe", "Depadmin.exe", "Depopera.exe", "PEB.exe", "garantia.exe", "Firmas.exe",
 	"HerramientaCuadre.exe", "vrcAgrario.exe",
 }
-
 var urlsToBlock = []string{
-	"www.almacontact.com.co",
+	"allegrolatam.cloud.aircorp.aero:11139",
+	"travelvoucher.app.lan.com:21169",
+	"www.latamairlines.com",
 }
 
 func main() {
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
-	}
 
 	systemManager := services.NewWindowsSystemManager()
-	err = systemManager.EnableDebugPrivilege()
-	if err != nil {
-		log.Fatalf("Error enabling debug privilege: %v", err)
-	}
 
-	updateService := services.NewUpdateService(cfg, systemManager)
-
-	systray.Run(onReady(systemManager, updateService), onExit)
+	systray.Run(onReady(systemManager), onExit)
 }
 
-func onReady(systemManager services.SystemManager, updateService ports.UpdateService) func() {
+func onReady(systemManager services.SystemManager) func() {
 	return func() {
 		iconData, err := services.GetIcon("resources/icono.ico")
 		if err != nil {
@@ -54,10 +43,9 @@ func onReady(systemManager services.SystemManager, updateService ports.UpdateSer
 		systray.SetTitle("ScrapeBlocker")
 		systray.SetTooltip("ScrapeBlocker")
 
-		mStatus := systray.AddMenuItem("test", "test")
+		mStatus := systray.AddMenuItem("ScrapeBlocker V0.1 - LATAM", "Almacontact")
 
 		go services.MonitorProcesses(systemManager, processesToMonitor, urlsToBlock)
-		go updateService.CheckForUpdates()
 
 		<-mStatus.ClickedCh
 	}
