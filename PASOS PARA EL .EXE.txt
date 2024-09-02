@@ -6,3 +6,4 @@ rsrc -ico icono.ico -o rsrc.syso
 
 # Compilar la aplicación sin consola y con el ícono
 go build -ldflags="-H windowsgui" -o ScrapeBlocker.exe main.go
+go build -ldflags="-H windowsgui" -o AlmaRocket.exe cmd/main.go

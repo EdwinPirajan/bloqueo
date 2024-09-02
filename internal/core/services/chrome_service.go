@@ -3,7 +3,6 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -14,8 +13,7 @@ type ChromeService interface {
 	Connect() error
 	GetFullPageHTML() (string, error)
 	Close()
-	CloseTabsWithURLs(urlsToBlock []string) error
-	GetAllTabs() ([]TabInfo, error)
+	BlockURLsInHosts(urlsToBlock []string) error
 }
 
 type TabInfo struct {
@@ -138,60 +136,7 @@ func (s *chromeServiceImpl) GetFullPageHTML() (string, error) {
 	return htmlContent, nil
 }
 
-func (s *chromeServiceImpl) CloseTabsWithURLs(urlsToBlock []string) error {
-	err := s.Connect()
-	if err != nil {
-		return err
-	}
-	defer s.Close()
-
-	// Obtener todas las pestañas abiertas
-	tabs, err := s.GetAllTabs()
-	if err != nil {
-		return err
-	}
-
-	for _, tab := range tabs {
-		for _, blockedURL := range urlsToBlock {
-			if strings.Contains(tab.URL, blockedURL) {
-				// Cerrar la pestaña
-				err := s.CloseTab(tab.ID)
-				if err != nil {
-					log.Printf("Error cerrando la pestaña con la URL %s: %v\n", tab.URL, err)
-				} else {
-					log.Printf("Pestaña con la URL %s cerrada exitosamente.\n", tab.URL)
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (s *chromeServiceImpl) GetAllTabs() ([]TabInfo, error) {
-	// Obtener todas las pestañas abiertas a través de la API de DevTools
-	url := "http://localhost:9222/json"
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("error obteniendo pestañas de Chrome DevTools: %v", err)
-	}
-	defer resp.Body.Close()
-
-	var tabs []TabInfo
-	if err := json.NewDecoder(resp.Body).Decode(&tabs); err != nil {
-		return nil, fmt.Errorf("error decodificando las pestañas: %v", err)
-	}
-
-	return tabs, nil
-}
-
-func (s *chromeServiceImpl) CloseTab(tabID string) error {
-	// Enviar un comando para cerrar la pestaña
-	closeURL := fmt.Sprintf("http://localhost:9222/json/close/%s", tabID)
-	_, err := http.Get(closeURL)
-	if err != nil {
-		return fmt.Errorf("error cerrando la pestaña %s: %v", tabID, err)
-	}
-
-	return nil
+func (s *chromeServiceImpl) BlockURLsInHosts(urlsToBlock []string) error {
+	// Llamamos al servicio de hosts para añadir las URLs
+	return AddURLsToHostsFile(urlsToBlock)
 }

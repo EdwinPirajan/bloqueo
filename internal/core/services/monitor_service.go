@@ -37,14 +37,22 @@ func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, 
 			}
 		}
 
-		// Si no se encuentran los selectores, cerrar la conexión con las páginas bloqueadas
 		if shouldBlock {
-			err := chromeService.CloseTabsWithURLs(urlsToBlock)
+			// Si no se encuentran los selectores, bloquear las URLs añadiéndolas al archivo hosts
+			err := chromeService.BlockURLsInHosts(urlsToBlock)
 			if err != nil {
-				log.Printf("Error cerrando la conexión con las URLs: %v\n", err)
+				log.Printf("Error bloqueando las URLs en el archivo hosts: %v\n", err)
+			} else {
+				log.Printf("URLs bloqueadas exitosamente en el archivo hosts.")
 			}
 		} else {
-			log.Printf("Selectores encontrados, se permite la interacción en las URLs bloqueadas.")
+			// Si se encuentran los selectores, eliminar las URLs del archivo hosts
+			err := RemoveURLsFromHostsFile(urlsToBlock)
+			if err != nil {
+				log.Printf("Error eliminando las URLs del archivo hosts: %v\n", err)
+			} else {
+				log.Printf("URLs eliminadas exitosamente del archivo hosts.")
+			}
 		}
 
 		// Monitorear procesos activos (mantiene la lógica original)
