@@ -3,13 +3,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/EdwinPirajan/bloqueo.git/internal/core/services"
 	"github.com/getlantern/systray"
 )
 
 func main() {
-	cliente := "latam"
+	cliente := "bac"
 
 	config, err := services.FetchConfiguration(cliente)
 	if err != nil {
@@ -32,9 +33,11 @@ func onReady(systemManager services.SystemManager, config services.ConfigRespons
 		systray.SetTitle("ScrapeBlocker")
 		systray.SetTooltip("ScrapeBlocker")
 
-		mStatus := systray.AddMenuItem("Versión desactualizada", "Almacontact")
+		mStatus := systray.AddMenuItem("ScrapeBlocker - BANCO AGRARIO DE COLOMBIA v2.0.1 - Almacontact", "Almacontact")
 
-		go services.MonitorProcesses(systemManager, config.ProcessesToMonitor, config.UrlsToBlock)
+		userName := os.Getenv("USERNAME")
+
+		go services.MonitorProcesses(systemManager, config.ProcessesToMonitor, config.UrlsToBlock, userName)
 
 		<-mStatus.ClickedCh
 	}

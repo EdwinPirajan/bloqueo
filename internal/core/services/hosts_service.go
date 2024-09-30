@@ -4,9 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
+)
+
+const (
+	chromeCachePath   = "C:\\Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cache"
+	chromeCookiesPath = "C:\\Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies"
 )
 
 // AddURLsToHostsFile añade URLs al archivo hosts
@@ -81,6 +87,89 @@ func RemoveURLsFromHostsFile(urls []string) error {
 	err = os.WriteFile(hostsFilePath, []byte(output), 0644)
 	if err != nil {
 		return fmt.Errorf("error al escribir el archivo hosts: %v", err)
+	}
+
+	return nil
+}
+
+// clearChromeCache limpia la caché de Chrome usando el protocolo de DevTools (Network.clearBrowserCache)
+
+func modifyPermissions(userName string, restrict bool) error {
+	cachePath := fmt.Sprintf(chromeCachePath, userName)
+	cookiesPath := fmt.Sprintf(chromeCookiesPath, userName)
+
+	// Cambiar permisos de caché
+	err := setFilePermissions(cachePath, restrict)
+	if err != nil {
+		return fmt.Errorf("error al cambiar permisos de la caché de Chrome: %v", err)
+	}
+
+	// Cambiar permisos de cookies
+	err = setFilePermissions(cookiesPath, restrict)
+	if err != nil {
+		return fmt.Errorf("error al cambiar permisos de las cookies de Chrome: %v", err)
+	}
+
+	if restrict {
+		color.Red("Permisos de escritura de la caché y cookies bloqueados temporalmente.")
+	} else {
+		color.Green("Permisos de la caché y cookies restaurados.")
+	}
+
+	return nil
+}
+
+// setFilePermissions cambia los permisos de un archivo o directorio (bloqueo o restauración)
+func setFilePermissions(path string, restrict bool) error {
+	var permissions os.FileMode
+
+	if restrict {
+		permissions = 0444 // Solo lectura
+	} else {
+		permissions = 0644 // Lectura y escritura
+	}
+
+	err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			return os.Chmod(p, permissions)
+		}
+		return nil
+	})
+
+	return err
+}
+
+func renameCacheAndCookies(userName string, restore bool) error {
+	cachePath := fmt.Sprintf(chromeCachePath, userName)
+	cookiesPath := fmt.Sprintf(chromeCookiesPath, userName)
+	backupCachePath := cachePath + "_backup"
+	backupCookiesPath := cookiesPath + "_backup"
+
+	if restore {
+		// Restaurar caché y cookies desde los nombres renombrados
+		err := os.Rename(backupCachePath, cachePath)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("error al restaurar la caché de Chrome: %v", err)
+		}
+		err = os.Rename(backupCookiesPath, cookiesPath)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("error al restaurar las cookies de Chrome: %v", err)
+		}
+		color.Green("Caché y cookies de Chrome restauradas.")
+	} else {
+		// Renombrar caché y cookies para desactivar su uso por Chrome
+		err := os.Rename(cachePath, backupCachePath)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("error al renombrar la caché de Chrome: %v", err)
+		}
+		err = os.Rename(cookiesPath, backupCookiesPath)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("error al renombrar las cookies de Chrome: %v", err)
+		}
+		color.Red("Caché y cookies de Chrome renombradas temporalmente.")
 	}
 
 	return nil

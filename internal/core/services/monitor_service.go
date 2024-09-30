@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, urlsToBlock []string) {
+func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, urlsToBlock []string, userName string) {
 	chromeService := NewChromeService("https://apps.mypurecloud.com")
 	appManager := NewWindowsApplicationManager(systemManager)
 
@@ -38,20 +38,32 @@ func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, 
 		}
 
 		if shouldBlock {
-			// Si no se encuentran los selectores, bloquear las URLs añadiéndolas al archivo hosts
+			// Bloquear las URLs añadiéndolas al archivo hosts
 			err := chromeService.BlockURLsInHosts(urlsToBlock)
 			if err != nil {
 				log.Printf("Error bloqueando las URLs en el archivo hosts: %v\n", err)
 			} else {
 				log.Printf("URLs bloqueadas exitosamente en el archivo hosts.")
 			}
+
+			// Renombrar la caché y cookies relacionadas para "desactivarlas"
+			err = renameCacheAndCookies(userName, false)
+			if err != nil {
+				log.Printf("Error renombrando la caché de Chrome: %v\n", err)
+			}
 		} else {
-			// Si se encuentran los selectores, eliminar las URLs del archivo hosts
+			// Desbloquear las URLs eliminándolas del archivo hosts
 			err := RemoveURLsFromHostsFile(urlsToBlock)
 			if err != nil {
 				log.Printf("Error eliminando las URLs del archivo hosts: %v\n", err)
 			} else {
 				log.Printf("URLs eliminadas exitosamente del archivo hosts.")
+			}
+
+			// Restaurar la caché y cookies renombradas
+			err = renameCacheAndCookies(userName, true)
+			if err != nil {
+				log.Printf("Error restaurando la caché de Chrome: %v\n", err)
 			}
 		}
 
