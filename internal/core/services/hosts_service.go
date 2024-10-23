@@ -11,6 +11,8 @@ import (
 	"github.com/fatih/color"
 )
 
+//cambios
+
 func AddURLsToHostsFile(urls []string) error {
 	const hostsFilePath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
 
