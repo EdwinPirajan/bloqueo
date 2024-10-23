@@ -3,30 +3,23 @@ package services
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
-	"path/filepath"
+	"os/exec"
 	"strings"
 
 	"github.com/fatih/color"
 )
 
-const (
-	chromeCachePath   = "C:\\Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cache"
-	chromeCookiesPath = "C:\\Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies"
-)
-
-// AddURLsToHostsFile añade URLs al archivo hosts
 func AddURLsToHostsFile(urls []string) error {
 	const hostsFilePath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
 
-	// Abrimos el archivo en modo lectura y escritura
 	file, err := os.OpenFile(hostsFilePath, os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("error al abrir el archivo hosts: %v", err)
 	}
 	defer file.Close()
 
-	// Leemos las líneas existentes
 	existingLines := make(map[string]bool)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -38,7 +31,6 @@ func AddURLsToHostsFile(urls []string) error {
 		return fmt.Errorf("error al leer el archivo hosts: %v", err)
 	}
 
-	// Escribimos las nuevas líneas si no están presentes
 	for _, url := range urls {
 		entry := fmt.Sprintf("0.0.0.0 %s", url)
 		if !existingLines[entry] {
@@ -54,11 +46,9 @@ func AddURLsToHostsFile(urls []string) error {
 	return nil
 }
 
-// RemoveURLsFromHostsFile elimina URLs del archivo hosts
 func RemoveURLsFromHostsFile(urls []string) error {
 	const hostsFilePath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
 
-	// Leer el archivo hosts actual
 	file, err := os.ReadFile(hostsFilePath)
 	if err != nil {
 		return fmt.Errorf("error al leer el archivo hosts: %v", err)
@@ -67,7 +57,6 @@ func RemoveURLsFromHostsFile(urls []string) error {
 	lines := strings.Split(string(file), "\n")
 	var newLines []string
 
-	// Filtrar las líneas para eliminar las URLs especificadas
 	for _, line := range lines {
 		shouldKeep := true
 		for _, url := range urls {
@@ -82,7 +71,6 @@ func RemoveURLsFromHostsFile(urls []string) error {
 		}
 	}
 
-	// Escribir las nuevas líneas al archivo hosts
 	output := strings.Join(newLines, "\n")
 	err = os.WriteFile(hostsFilePath, []byte(output), 0644)
 	if err != nil {
@@ -92,84 +80,94 @@ func RemoveURLsFromHostsFile(urls []string) error {
 	return nil
 }
 
-// clearChromeCache limpia la caché de Chrome usando el protocolo de DevTools (Network.clearBrowserCache)
-
-func modifyPermissions(userName string, restrict bool) error {
-	cachePath := fmt.Sprintf(chromeCachePath, userName)
-	cookiesPath := fmt.Sprintf(chromeCookiesPath, userName)
-
-	// Cambiar permisos de caché
-	err := setFilePermissions(cachePath, restrict)
+func CloseChromeTabsWithURLs(urls []string) error {
+	cmd := exec.Command("tasklist", "/FI", "IMAGENAME eq chrome.exe", "/FO", "CSV", "/NH")
+	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("error al cambiar permisos de la caché de Chrome: %v", err)
+		return fmt.Errorf("error al obtener la lista de procesos de Chrome: %v", err)
 	}
 
-	// Cambiar permisos de cookies
-	err = setFilePermissions(cookiesPath, restrict)
-	if err != nil {
-		return fmt.Errorf("error al cambiar permisos de las cookies de Chrome: %v", err)
-	}
+	lines := strings.Split(string(output), "\n")
 
-	if restrict {
-		color.Red("Permisos de escritura de la caché y cookies bloqueados temporalmente.")
-	} else {
-		color.Green("Permisos de la caché y cookies restaurados.")
+	for _, line := range lines {
+		fields := strings.Split(line, ",")
+		if len(fields) < 2 {
+			continue
+		}
+
+		pid := strings.Trim(fields[1], "\"")
+
+		cmdURLs := exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%s", pid), "get", "CommandLine")
+		outputURLs, err := cmdURLs.Output()
+		if err != nil {
+			log.Printf("Error al obtener las URLs para el proceso %s: %v", pid, err)
+			continue
+		}
+
+		for _, url := range urls {
+			if strings.Contains(string(outputURLs), url) {
+				cmdKill := exec.Command("taskkill", "/PID", pid, "/F")
+				err = cmdKill.Run()
+				if err != nil {
+					log.Printf("Error al cerrar el proceso %s: %v", pid, err)
+				} else {
+					log.Printf("Cerrada pestaña con URL: %s", url)
+				}
+				break
+			}
+		}
 	}
 
 	return nil
 }
 
-// setFilePermissions cambia los permisos de un archivo o directorio (bloqueo o restauración)
-func setFilePermissions(path string, restrict bool) error {
-	var permissions os.FileMode
-
-	if restrict {
-		permissions = 0444 // Solo lectura
-	} else {
-		permissions = 0644 // Lectura y escritura
+func HardReloadTabsWithURLs(urlsToBlock []string) error {
+	cmd := exec.Command("tasklist", "/FI", "IMAGENAME eq chrome.exe", "/FO", "CSV", "/NH")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("error al obtener la lista de procesos de Chrome: %v", err)
 	}
 
-	err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			return os.Chmod(p, permissions)
-		}
-		return nil
-	})
+	lines := strings.Split(string(output), "\n")
 
-	return err
+	for _, line := range lines {
+		fields := strings.Split(line, ",")
+		if len(fields) < 2 {
+			continue
+		}
+
+		pid := strings.Trim(fields[1], "\"")
+
+		cmdURLs := exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%s", pid), "get", "CommandLine")
+		outputURLs, err := cmdURLs.Output()
+		if err != nil {
+			log.Printf("Error al obtener las URLs para el proceso %s: %v", pid, err)
+			continue
+		}
+
+		for _, url := range urlsToBlock {
+			if strings.Contains(string(outputURLs), url) {
+				err = hardReloadChromeTab(pid)
+				if err != nil {
+					log.Printf("Error al hacer hard reload de la pestaña con URL %s: %v", url, err)
+				} else {
+					log.Printf("Hard reload realizado con éxito para la pestaña con URL: %s", url)
+				}
+				break
+			}
+		}
+	}
+
+	fmt.Println("Hard reload de pestañas completado", urlsToBlock)
+
+	return nil
 }
 
-func renameCacheAndCookies(userName string, restore bool) error {
-	cachePath := fmt.Sprintf(chromeCachePath, userName)
-	cookiesPath := fmt.Sprintf(chromeCookiesPath, userName)
-	backupCachePath := cachePath + "_backup"
-	backupCookiesPath := cookiesPath + "_backup"
-
-	if restore {
-		// Restaurar caché y cookies desde los nombres renombrados
-		err := os.Rename(backupCachePath, cachePath)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("error al restaurar la caché de Chrome: %v", err)
-		}
-		err = os.Rename(backupCookiesPath, cookiesPath)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("error al restaurar las cookies de Chrome: %v", err)
-		}
-		color.Green("Caché y cookies de Chrome restauradas.")
-	} else {
-		// Renombrar caché y cookies para desactivar su uso por Chrome
-		err := os.Rename(cachePath, backupCachePath)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("error al renombrar la caché de Chrome: %v", err)
-		}
-		err = os.Rename(cookiesPath, backupCookiesPath)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("error al renombrar las cookies de Chrome: %v", err)
-		}
-		color.Red("Caché y cookies de Chrome renombradas temporalmente.")
+func hardReloadChromeTab(pid string) error {
+	cmd := exec.Command("taskkill", "/PID", pid, "/F")
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error al hacer hard reload de la pestaña con PID %s: %v", pid, err)
 	}
 
 	return nil

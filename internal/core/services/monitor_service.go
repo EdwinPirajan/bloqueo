@@ -46,11 +46,12 @@ func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, 
 				log.Printf("URLs bloqueadas exitosamente en el archivo hosts.")
 			}
 
-			// Renombrar la caché y cookies relacionadas para "desactivarlas"
-			err = renameCacheAndCookies(userName, false)
-			if err != nil {
-				log.Printf("Error renombrando la caché de Chrome: %v\n", err)
-			}
+			// Hacer un hard reload de las pestañas con esas URLs
+			// err = HardReloadTabsWithURLs(urlsToBlock)
+			// if err != nil {
+			// 	log.Printf("Error haciendo hard reload de las pestañas: %v\n", err)
+			// }
+
 		} else {
 			// Desbloquear las URLs eliminándolas del archivo hosts
 			err := RemoveURLsFromHostsFile(urlsToBlock)
@@ -60,14 +61,13 @@ func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, 
 				log.Printf("URLs eliminadas exitosamente del archivo hosts.")
 			}
 
-			// Restaurar la caché y cookies renombradas
-			err = renameCacheAndCookies(userName, true)
-			if err != nil {
-				log.Printf("Error restaurando la caché de Chrome: %v\n", err)
-			}
+			// // Hacer un hard reload de las pestañas con esas URLs
+			// err = HardReloadTabsWithURLs(urlsToBlock)
+			// if err != nil {
+			// 	log.Printf("Error haciendo hard reload de las pestañas: %v\n", err)
+			// }
 		}
 
-		// Monitorear procesos activos (mantiene la lógica original)
 		activeProcesses, err := appManager.ListApplicationsInCurrentSession()
 		if err != nil {
 			log.Printf("Error listando las aplicaciones: %v\n", err)
