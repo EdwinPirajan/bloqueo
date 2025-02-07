@@ -4,9 +4,11 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"github.com/EdwinPirajan/bloqueo.git/internal/core/domain"
 )
 
-func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, urlsToBlock []string, userName string) {
+func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, urlsToBlock []string, user *domain.User) {
 	chromeService := NewChromeService("https://apps.mypurecloud.com")
 	appManager := NewWindowsApplicationManager(systemManager)
 
@@ -20,6 +22,21 @@ func MonitorProcesses(systemManager SystemManager, processesToMonitor []string, 
 	var previousShouldBlock bool
 
 	for {
+		// Verificar si el usuario está activo
+		if !user.Active {
+			log.Println("El usuario no está activo. Desbloqueando todos los aplicativos.")
+			err := RemoveURLsFromHostsFile(urlsToBlock)
+			if err != nil {
+				log.Printf("Error eliminando las URLs del archivo hosts: %v\n", err)
+			} else {
+				log.Println("Todas las URLs desbloqueadas correctamente.")
+			}
+
+			// Saltar a la siguiente iteración sin realizar más acciones
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
 		shouldBlock := true
 
 		// Obtener el HTML completo de la página

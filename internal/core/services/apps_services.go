@@ -9,13 +9,13 @@ import (
 )
 
 type ConfigResponse struct {
-	ProcessesToMonitor []string `json:"processes_to_monitor"`
-	UrlsToBlock        []string `json:"urls_to_block"`
+	ProcessesToMonitor []string `json:"processes"`
+	UrlsToBlock        []string `json:"urls"`
 }
 
 func FetchConfiguration(cliente string) (ConfigResponse, error) {
 	var config ConfigResponse
-	url := fmt.Sprintf("http://10.96.16.68:8080/apps/%s", cliente)
+	url := fmt.Sprintf("http://localhost:8080/apps/%s", cliente)
 
 	client := http.Client{
 		Timeout: 10 * time.Second,
@@ -40,6 +40,8 @@ func FetchConfiguration(cliente string) (ConfigResponse, error) {
 	if err != nil {
 		return config, fmt.Errorf("error deserializando la respuesta JSON: %v", err)
 	}
+
+	fmt.Println("Configuración obtenida correctamente", config)
 
 	return config, nil
 }
