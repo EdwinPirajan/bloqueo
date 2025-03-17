@@ -1,0 +1,13 @@
+      PID    PPID    PGID     WINPID   TTY         UID    STIME COMMAND
+     2092    1903    2092      17160  pty0     1066955 10:37:18 /c/Program Files/Go/bin/go
+     1888    1866    1888      20332  pty2     1066955 18:55:57 /usr/bin/bash
+     1903    1902    1903       8244  pty0     1066955 18:58:59 /usr/bin/bash
+     1896    1888    1888      20412  pty2     1066955 18:56:04 /c/Program Files/nodejs/node
+     1936       1    1936      19076  ?        1066955 19:18:28 /usr/bin/mintty
+     1866    1865    1866      17280  pty2     1066955 18:55:52 /usr/bin/bash
+     2018    2017    2018      14388  pty3     1066955 19:28:21 /usr/bin/bash
+     1865       1    1865       7736  ?        1066955 18:55:52 /usr/bin/mintty
+     1902       1    1902       3780  ?        1066955 18:58:58 /usr/bin/mintty
+     2169    1937    2169      21592  pty1     1066955 10:51:49 /usr/bin/PS
+     2017       1    2017      11140  ?        1066955 19:28:21 /usr/bin/mintty
+     1937    1936    1937      19928  pty1     1066955 19:18:28 /usr/bin/bash

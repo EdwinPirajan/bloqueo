@@ -15,7 +15,7 @@ type ConfigResponse struct {
 
 func FetchConfiguration(cliente string) (ConfigResponse, error) {
 	var config ConfigResponse
-	url := fmt.Sprintf("http://localhost:8080/apps/%s", cliente)
+	url := fmt.Sprintf("http://10.96.16.67:8080/api/v1/apps/%s", cliente)
 
 	client := http.Client{
 		Timeout: 10 * time.Second,
