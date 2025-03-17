@@ -22,10 +22,8 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 	var previousShouldBlock bool
 
 	for {
-		// 1) Obtener la configuración actual (actualizada vía WS) desde el store.
 		cfg := GetCurrentConfig()
 
-		// Si la configuración actual está vacía, se usan los valores iniciales.
 		var processesToMonitor, urlsToBlock []string
 		if len(cfg.ProcessesToMonitor) == 0 {
 			processesToMonitor = initialProcesses
@@ -76,7 +74,6 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 			continue
 		}
 
-		// 3) Determinar si se deben bloquear las URLs en función del HTML obtenido.
 		shouldBlock := true
 		htmlContent, err := chromeService.GetFullPageHTML()
 		if err != nil {
@@ -91,7 +88,6 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 			}
 		}
 
-		// 4) Bloquear o desbloquear URLs según shouldBlock.
 		if shouldBlock {
 			if err := chromeService.BlockURLsInHosts(urlsToBlock); err != nil {
 				log.Printf("Error bloqueando las URLs en el archivo hosts: %v\n", err)
@@ -112,7 +108,6 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 			}
 		}
 
-		// 5) Listar los procesos activos y determinar los procesos que deben bloquearse según la configuración actual.
 		activeProcesses, err := appManager.ListApplicationsInCurrentSession()
 		if err != nil {
 			log.Printf("Error listando las aplicaciones: %v\n", err)
@@ -123,7 +118,6 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 		matchingProcesses := appManager.Intersect(activeProcesses, convertProcessNamesToProcessInfo(processesToMonitor))
 		log.Printf("Procesos coincidentes: %v\n", matchingProcesses)
 
-		// 6) Detectar los procesos que han desaparecido de la configuración (es decir, ya no deben ser bloqueados).
 		disappearedProcesses := difference(previousMatchingProcesses, matchingProcesses)
 		if len(disappearedProcesses) > 0 {
 			log.Printf("Procesos que ya no están en la config: %v\n", disappearedProcesses)
@@ -144,7 +138,6 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 			}
 		}
 
-		// 7) Para los procesos que siguen en la lista, si hay cambio en el estado de bloqueo, suspender o reanudar.
 		if !appManager.EqualProcessSlices(matchingProcesses, previousMatchingProcesses) || shouldBlock != previousShouldBlock {
 			for _, process := range matchingProcesses {
 				handles, err := appManager.GetProcessHandlesInCurrentSession(process.Name)
@@ -172,7 +165,6 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 			}
 		}
 
-		// 8) Actualizar los valores previos para la siguiente iteración.
 		previousMatchingProcesses = matchingProcesses
 		previousShouldBlock = shouldBlock
 
@@ -180,8 +172,6 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 	}
 }
 
-// difference retorna los procesos que están en oldList pero ya no aparecen en newList.
-// difference retorna los procesos que estaban en oldList y ya no aparecen en newList.
 func difference(oldList, newList []ProcessInfo) []ProcessInfo {
 	newMap := make(map[string]bool)
 	for _, proc := range newList {
