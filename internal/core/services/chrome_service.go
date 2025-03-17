@@ -147,11 +147,13 @@ func (s *chromeServiceImpl) GetFullPageHTML() (string, error) {
 }
 
 func (s *chromeServiceImpl) BlockURLsInHosts(urlsToBlock []string) error {
+	// Agregar las URLs al archivo hosts
 	err := AddURLsToHostsFile(urlsToBlock)
 	if err != nil {
 		return err
 	}
 
+	// Obtener todas las pestañas abiertas
 	url := "http://localhost:9222/json"
 	resp, err := http.Get(url)
 	if err != nil {
@@ -164,6 +166,7 @@ func (s *chromeServiceImpl) BlockURLsInHosts(urlsToBlock []string) error {
 		return fmt.Errorf("error al decodificar los targets: %v", err)
 	}
 
+	// Recorrer todas las pestañas y aplicar la acción a las que coincidan
 	for _, target := range targets {
 		pageURL, ok := target["url"].(string)
 		if !ok {
@@ -174,6 +177,7 @@ func (s *chromeServiceImpl) BlockURLsInHosts(urlsToBlock []string) error {
 			continue
 		}
 
+		// Verificar si la URL de la pestaña coincide con alguna de las URLs a bloquear
 		for _, blockedURL := range urlsToBlock {
 			if strings.Contains(pageURL, blockedURL) {
 				wsURL, ok := target["webSocketDebuggerUrl"].(string)
@@ -182,14 +186,17 @@ func (s *chromeServiceImpl) BlockURLsInHosts(urlsToBlock []string) error {
 					continue
 				}
 
+				// Almacenar la URL anterior
 				s.tabPrevURLs[tabID] = pageURL
 
+				// Conectar a la pestaña y aplicar la acción
 				if err := s.applyActionToTab(wsURL); err != nil {
 					fmt.Printf("Error al aplicar la acción a la pestaña con URL %s: %v\n", pageURL, err)
 				} else {
 					fmt.Printf("Acción aplicada a la pestaña con URL %s\n", pageURL)
 				}
 
+				// No necesitamos seguir verificando otras URLs para esta pestaña
 				break
 			}
 		}
@@ -199,6 +206,7 @@ func (s *chromeServiceImpl) BlockURLsInHosts(urlsToBlock []string) error {
 }
 
 func (s *chromeServiceImpl) NavigateBackToPreviousURLs() error {
+	// Obtener todas las pestañas abiertas
 	url := "http://localhost:9222/json"
 	resp, err := http.Get(url)
 	if err != nil {
@@ -211,6 +219,7 @@ func (s *chromeServiceImpl) NavigateBackToPreviousURLs() error {
 		return fmt.Errorf("error al decodificar los targets: %v", err)
 	}
 
+	// Recorrer todas las pestañas y navegar de regreso a las URLs anteriores
 	for _, target := range targets {
 		tabID, ok := target["id"].(string)
 		if !ok {

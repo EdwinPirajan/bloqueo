@@ -22,8 +22,10 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 	var previousShouldBlock bool
 
 	for {
+		// 1) Obtener la configuración actual (actualizada vía WS) desde el store.
 		cfg := GetCurrentConfig()
 
+		// Si la configuración actual está vacía, se usan los valores iniciales.
 		var processesToMonitor, urlsToBlock []string
 		if len(cfg.ProcessesToMonitor) == 0 {
 			processesToMonitor = initialProcesses
@@ -172,6 +174,7 @@ func MonitorProcesses(systemManager SystemManager, initialProcesses []string, in
 	}
 }
 
+// difference retorna los procesos que estaban en oldList y ya no aparecen en newList.
 func difference(oldList, newList []ProcessInfo) []ProcessInfo {
 	newMap := make(map[string]bool)
 	for _, proc := range newList {
