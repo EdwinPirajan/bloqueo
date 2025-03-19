@@ -10,7 +10,7 @@ import (
 )
 
 func Run() {
-	cliente := "bacb"
+	cliente := "latam"
 	baseWebSocketURL := "ws://10.96.16.67:8080/api/v1/ws"
 
 	user, err := services.GetUser()
@@ -41,16 +41,14 @@ func onReady(systemManager services.SystemManager, config services.ConfigRespons
 	systray.SetTitle("ScrapeBlocker")
 	systray.SetTooltip("ScrapeBlocker")
 
-	mStatus := systray.AddMenuItem("ScrapeBlocker - Demo Banco de Bogotá v0.1 - Almacontact", "Almacontact")
+	mStatus := systray.AddMenuItem("ScrapeBlocker - LATAM Airlines v1.0.2 - Almacontact", "Almacontact")
 
-	// Lanza la conexión WebSocket en una goroutine
 	go func() {
 		if err := services.ConnectAndKeepOpen(wsURL, user); err != nil {
 			log.Printf("Error en WebSocket: %v", err)
 		}
 	}()
 
-	// Lanza el monitor de procesos en otra goroutine
 	log.Printf("Iniciando MonitorProcesses con config: %+v y usuario: %+v", config, user)
 	go services.MonitorProcesses(systemManager, config.ProcessesToMonitor, config.UrlsToBlock, user)
 
